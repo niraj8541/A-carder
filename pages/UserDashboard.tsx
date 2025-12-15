@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/db';
 import { Order, Transaction, GlobalSettings } from '../types';
-import { Wallet, Package, Clock, CheckCircle, XCircle, FileText, Upload, ImageOff } from 'lucide-react';
+import { Wallet, Package, Clock, CheckCircle, XCircle, FileText, Upload, ImageOff, Maximize2, Copy, ScanLine } from 'lucide-react';
 
 export const UserDashboard: React.FC = () => {
   const { user, refreshUser } = useAuth();
@@ -11,6 +11,7 @@ export const UserDashboard: React.FC = () => {
   const [settings, setSettings] = useState<GlobalSettings>(db.getSettings());
   const [activeTab, setActiveTab] = useState<'orders' | 'wallet'>('orders');
   const [qrError, setQrError] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
   
   // Wallet Add Money State
   const [amount, setAmount] = useState('');
@@ -71,10 +72,15 @@ export const UserDashboard: React.FC = () => {
     setTransactions(allTxns.filter(t => t.userId === user.id).reverse());
   };
 
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    alert("UPI ID Copied to clipboard!");
+  };
+
   if (!user) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       {/* Profile Header */}
       <div className="bg-surface rounded-2xl p-6 border border-slate-700 shadow-lg flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="flex items-center gap-4">
@@ -160,23 +166,45 @@ export const UserDashboard: React.FC = () => {
           <div className="bg-surface p-6 rounded-2xl border border-slate-700">
             <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Wallet className="text-primary"/> Add Funds</h3>
             
-            <div className="flex flex-col items-center justify-center mb-6 bg-white p-4 rounded-xl w-max mx-auto overflow-hidden">
+            {/* Clickable QR Card */}
+            <div 
+              onClick={() => {
+                if (settings.upiQrUrl && !qrError) setQrModalOpen(true);
+              }}
+              className="group cursor-pointer flex flex-col items-center justify-center mb-6 bg-white p-4 rounded-xl w-max mx-auto overflow-hidden relative shadow-lg hover:shadow-2xl hover:scale-105 transition-all duration-300"
+            >
+               {/* Header Badge */}
+               <div className="absolute top-0 left-0 w-full bg-black/5 h-6 flex items-center justify-center">
+                 <ScanLine size={12} className="text-black/30" />
+               </div>
+
+               {/* Overlay with instructions on hover */}
+               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 flex flex-col items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-10">
+                 <Maximize2 className="text-black drop-shadow-md mb-1" size={32} />
+                 <span className="text-xs font-bold text-black bg-white/80 px-2 py-0.5 rounded shadow-sm">View Fullscreen</span>
+               </div>
+
                {/* QR Display */}
+               <div className="mt-2">
                {settings.upiQrUrl && !qrError ? (
                  <img 
                    src={settings.upiQrUrl} 
                    alt="UPI QR" 
-                   className="w-48 h-48 object-contain"
+                   className="w-48 h-48 object-contain mix-blend-multiply"
                    onError={() => setQrError(true)} 
                  />
                ) : (
                  <div className="w-48 h-48 flex flex-col items-center justify-center bg-gray-100 text-slate-800 text-sm p-4 text-center">
                    <ImageOff size={24} className="mb-2 text-slate-400"/>
                    <span className="font-medium">QR not available</span>
-                   <span className="text-xs text-slate-500 mt-1">Please use UPI ID below</span>
+                   <span className="text-xs text-slate-500 mt-1">Use UPI ID below</span>
                  </div>
                )}
-               <p className="text-black font-mono font-bold mt-2 text-sm px-2 py-1 bg-gray-100 rounded">{settings.upiId}</p>
+               </div>
+               
+               <p className="text-black font-mono font-bold mt-2 text-sm px-3 py-1 bg-gray-100 rounded border border-gray-200 flex items-center gap-2">
+                 {settings.upiId} 
+               </p>
             </div>
             
             <p className="text-center text-slate-400 text-sm mb-6 bg-slate-800/50 p-3 rounded-lg border border-slate-700">
@@ -232,6 +260,50 @@ export const UserDashboard: React.FC = () => {
                 </div>
               ))}
               {transactions.length === 0 && <p className="text-slate-500 text-center text-sm">No transactions found.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Modal (Lightbox) */}
+      {qrModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={() => setQrModalOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-3xl p-8 max-w-sm w-full relative shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col items-center" 
+            onClick={e => e.stopPropagation()}
+          >
+            <button 
+              onClick={() => setQrModalOpen(false)} 
+              className="absolute top-4 right-4 bg-gray-100 hover:bg-gray-200 p-2 rounded-full text-gray-500 transition-colors"
+            >
+              <XCircle size={24} />
+            </button>
+            
+            <h3 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <ScanLine className="text-primary" /> Scan to Pay
+            </h3>
+            
+            <div className="p-4 bg-white border-2 border-slate-100 rounded-2xl shadow-inner mb-6">
+               <img src={settings.upiQrUrl} alt="Large QR" className="w-64 h-64 object-contain mix-blend-multiply" />
+            </div>
+
+            <div className="w-full space-y-3">
+              <p className="text-center text-slate-500 text-sm font-medium">Merchant UPI ID</p>
+              <button 
+                onClick={() => copyToClipboard(settings.upiId)}
+                className="w-full flex items-center justify-between bg-slate-100 hover:bg-slate-200 p-4 rounded-xl border border-slate-200 transition-all group"
+              >
+                 <span className="font-mono font-bold text-slate-900 truncate">{settings.upiId}</span>
+                 <div className="flex items-center gap-1 text-xs font-bold text-primary uppercase bg-white px-2 py-1 rounded border border-slate-200">
+                    <Copy size={12} /> Copy
+                 </div>
+              </button>
+              <p className="text-center text-xs text-slate-400 leading-relaxed pt-2 border-t border-slate-100">
+                {settings.paymentNote}
+              </p>
             </div>
           </div>
         </div>

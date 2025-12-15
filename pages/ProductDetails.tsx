@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useHistory } from 'react-router-dom';
 import { db } from '../services/db';
 import { Product, Coupon } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { ShieldCheck, Zap, Ticket, ArrowLeft, Loader2 } from 'lucide-react';
 
 export const ProductDetails: React.FC = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const history = useHistory();
   const { user, refreshUser } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,8 +18,8 @@ export const ProductDetails: React.FC = () => {
   useEffect(() => {
     const found = db.getProducts().find(p => p.id === id);
     if (found) setProduct(found);
-    else navigate('/');
-  }, [id, navigate]);
+    else history.push('/');
+  }, [id, history]);
 
   if (!product) return null;
 
@@ -37,7 +37,7 @@ export const ProductDetails: React.FC = () => {
 
   const handleBuy = async () => {
     if (!user) {
-      navigate('/login');
+      history.push('/login');
       return;
     }
     
@@ -45,7 +45,7 @@ export const ProductDetails: React.FC = () => {
 
     if (user.walletBalance < finalPrice) {
       alert("Insufficient wallet balance. Please add money.");
-      navigate('/dashboard');
+      history.push('/dashboard');
       return;
     }
 
@@ -61,14 +61,14 @@ export const ProductDetails: React.FC = () => {
         refreshUser();
         setLoading(false);
         alert("Order placed successfully! Wait for admin approval to view your card details.");
-        navigate('/dashboard');
+        history.push('/dashboard');
       }, 1500);
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto">
-      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-400 hover:text-white mb-6">
+      <button onClick={() => history.goBack()} className="flex items-center gap-2 text-slate-400 hover:text-white mb-6">
         <ArrowLeft size={16} /> Back to Store
       </button>
 

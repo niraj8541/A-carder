@@ -2,18 +2,18 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/db';
 import { User, Product, Order, GlobalSettings, UserRole, Coupon, Transaction } from '../types';
-import { useNavigate } from 'react-router-dom';
+import { useHistory } from 'react-router-dom';
 import { Users, ShoppingBag, ClipboardList, Settings, Ticket, Check, X, Search, Trash2, Edit2, Plus, Ban, Unlock, Wallet, Upload, Image as ImageIcon } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
   const { user, isAdmin, isSuperAdmin } = useAuth();
-  const navigate = useNavigate();
+  const history = useHistory();
   const [activeTab, setActiveTab] = useState<'users' | 'products' | 'orders' | 'settings' | 'coupons' | 'payments'>('orders');
 
   // Check auth
   useEffect(() => {
-    if (!isAdmin) navigate('/dashboard');
-  }, [isAdmin, navigate]);
+    if (!isAdmin) history.push('/dashboard');
+  }, [isAdmin, history]);
 
   if (!isAdmin || !user) return null;
 
@@ -58,8 +58,8 @@ export const AdminDashboard: React.FC = () => {
 };
 
 // --- Helper for file upload & compression ---
-// Heavily compressed to ensure it fits in localStorage (Max 300px width, 0.6 quality)
-const compressImage = (file: File, maxWidth = 300, quality = 0.6): Promise<string> => {
+// Heavily compressed to ensure it fits in localStorage (Max 250px width, 0.5 quality)
+const compressImage = (file: File, maxWidth = 250, quality = 0.5): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -369,12 +369,13 @@ const ProductsPanel = () => {
     try {
       db.saveProduct(newProduct);
       setProducts(db.getProducts());
+      // Only reset after successful save
       setEditing(null);
       setProductImage('');
       e.currentTarget.reset();
     } catch (error) {
        console.error(error);
-       alert("Error saving product. Storage might be full.");
+       alert("CRITICAL ERROR: Storage is full! Delete old products or use smaller images. Product NOT saved.");
     }
   };
 
@@ -472,15 +473,19 @@ const SettingsPanel = () => {
       try {
         const base64 = await compressImage(file);
         
-        // AUTO SAVE IMMEDIATELY
+        // AUTO SAVE ATTEMPT
         const updatedSettings = { ...settings, upiQrUrl: base64 };
-        setSettings(updatedSettings);
         
         try {
+            // Try saving to DB FIRST to ensure quota isn't exceeded
             db.saveSettings(updatedSettings);
+            // If success, update UI state
+            setSettings(updatedSettings);
             alert("QR Code updated and saved successfully!");
         } catch(e) {
-            alert("Storage full! Please use a simpler image.");
+            // If failure, do NOT update UI, let user know
+            console.error(e);
+            alert("CRITICAL ERROR: Storage is full! The image could not be saved. Please remove old products or use a smaller image.");
         }
 
       } catch (err) {
@@ -490,6 +495,18 @@ const SettingsPanel = () => {
     }
   };
 
+  const handleResetDefaults = () => {
+      if (confirm("This will reset payment settings to default. Proceed?")) {
+          const defaults: GlobalSettings = {
+              upiId: 'merchant@upi',
+              upiQrUrl: '',
+              paymentNote: 'Scan and pay.'
+          };
+          db.saveSettings(defaults);
+          setSettings(defaults);
+      }
+  };
+
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">Payment Settings</h2>
@@ -497,7 +514,7 @@ const SettingsPanel = () => {
         <div>
            <label className="block mb-1 text-slate-400">UPI ID</label>
            <input 
-             value={settings.upiId} 
+             value={settings.upiId || ''} 
              onChange={e => setSettings({...settings, upiId: e.target.value})}
              className="w-full bg-background border border-slate-600 rounded p-2 text-white" 
            />
@@ -506,7 +523,7 @@ const SettingsPanel = () => {
            <label className="block mb-1 text-slate-400">UPI QR Image</label>
            <div className="flex gap-2">
                <input 
-                 value={settings.upiQrUrl} 
+                 value={settings.upiQrUrl || ''} 
                  onChange={e => setSettings({...settings, upiQrUrl: e.target.value})}
                  className="flex-1 bg-background border border-slate-600 rounded p-2 text-white" 
                  placeholder="Image URL or Upload"
@@ -526,12 +543,15 @@ const SettingsPanel = () => {
         <div>
            <label className="block mb-1 text-slate-400">Payment Instructions / Note</label>
            <textarea 
-             value={settings.paymentNote} 
+             value={settings.paymentNote || ''} 
              onChange={e => setSettings({...settings, paymentNote: e.target.value})}
              className="w-full bg-background border border-slate-600 rounded p-2 text-white h-24" 
            />
         </div>
-        <button className="bg-primary text-white px-6 py-2 rounded hover:bg-indigo-600">Save Text Changes</button>
+        <div className="flex gap-4">
+            <button className="bg-primary text-white px-6 py-2 rounded hover:bg-indigo-600">Save Text Changes</button>
+            <button type="button" onClick={handleResetDefaults} className="bg-red-900/50 text-red-200 border border-red-800 px-4 py-2 rounded text-sm hover:bg-red-900">Reset Defaults</button>
+        </div>
       </form>
     </div>
   );

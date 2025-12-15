@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Switch, Route, Redirect } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
@@ -19,14 +19,14 @@ const App: React.FC = () => {
     <AuthProvider>
       <Router>
         <Layout>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/product/:id" element={<ProductDetails />} />
-            <Route path="/dashboard" element={<UserDashboard />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <Switch>
+            <Route exact path="/" component={Home} />
+            <Route path="/login" component={Login} />
+            <Route path="/product/:id" component={ProductDetails} />
+            <Route path="/dashboard" component={UserDashboard} />
+            <Route path="/admin" component={AdminDashboard} />
+            <Redirect to="/" />
+          </Switch>
         </Layout>
       </Router>
     </AuthProvider>

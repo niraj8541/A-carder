@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useHistory } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
 import { Logo } from '../components/Logo';
@@ -10,19 +10,19 @@ export const Login: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const { login, signup, user } = useAuth();
-  const navigate = useNavigate();
+  const history = useHistory();
   const [error, setError] = useState('');
 
   // Redirect if already logged in
   React.useEffect(() => {
     if (user) {
       if (user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN) {
-        navigate('/admin');
+        history.push('/admin');
       } else {
-        navigate('/dashboard');
+        history.push('/dashboard');
       }
     }
-  }, [user, navigate]);
+  }, [user, history]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

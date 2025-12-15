@@ -1,18 +1,18 @@
 import React from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useHistory, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, User as UserIcon, Shield, Wallet, ShoppingBag, Menu, X } from 'lucide-react';
 import { Logo } from './Logo';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout, isAdmin } = useAuth();
-  const navigate = useNavigate();
+  const history = useHistory();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    history.push('/login');
   };
 
   const isActive = (path: string) => location.pathname === path;

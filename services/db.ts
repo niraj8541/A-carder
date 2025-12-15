@@ -16,6 +16,12 @@ const DEFAULT_ADMIN = {
   phone: '7070294070'
 };
 
+const DEFAULT_SETTINGS: GlobalSettings = {
+  upiId: 'merchant@upi',
+  upiQrUrl: '', 
+  paymentNote: 'Scan and pay. Mention your username in remarks.'
+};
+
 export const db = {
   init: () => {
     // 1. Ensure Super Admin exists or is updated with latest credentials
@@ -44,12 +50,12 @@ export const db = {
 
     // 2. Default Settings
     if (!localStorage.getItem(KEYS.SETTINGS)) {
-      const settings: GlobalSettings = {
-        upiId: 'merchant@upi',
-        upiQrUrl: 'https://picsum.photos/300/300?grayscale', // Placeholder QR
-        paymentNote: 'Scan and pay. Mention your username in remarks.'
+      // Use a placeholder if initializing from scratch
+      const initialSettings = {
+        ...DEFAULT_SETTINGS,
+        upiQrUrl: 'https://picsum.photos/300/300?grayscale'
       };
-      localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
+      localStorage.setItem(KEYS.SETTINGS, JSON.stringify(initialSettings));
     }
 
     // 3. Default Products
@@ -225,7 +231,15 @@ export const db = {
   },
 
   // Settings
-  getSettings: (): GlobalSettings => JSON.parse(localStorage.getItem(KEYS.SETTINGS) || '{}'),
+  getSettings: (): GlobalSettings => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(KEYS.SETTINGS) || '{}');
+      // Merge with defaults to ensure keys like upiId always exist
+      return { ...DEFAULT_SETTINGS, ...stored };
+    } catch (e) {
+      return DEFAULT_SETTINGS;
+    }
+  },
   
   saveSettings: (settings: GlobalSettings) => {
     localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
