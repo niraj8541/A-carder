@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/db';
 import { User, Product, Order, GlobalSettings, UserRole, Coupon, Transaction } from '../types';
 import { useNavigate } from 'react-router-dom';
-import { Users, ShoppingBag, ClipboardList, Settings, Ticket, Check, X, Search, Trash2, Edit2, Plus, Ban, Unlock, Wallet } from 'lucide-react';
+import { Users, ShoppingBag, ClipboardList, Settings, Ticket, Check, X, Search, Trash2, Edit2, Plus, Ban, Unlock, Wallet, Upload, Image as ImageIcon } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
   const { user, isAdmin, isSuperAdmin } = useAuth();
@@ -55,6 +55,16 @@ export const AdminDashboard: React.FC = () => {
       </div>
     </div>
   );
+};
+
+// --- Helper for file upload ---
+const convertFileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
 };
 
 // --- Sub Components ---
@@ -294,6 +304,28 @@ const UsersPanel = ({ isSuperAdmin }: { isSuperAdmin: boolean }) => {
 const ProductsPanel = () => {
   const [products, setProducts] = useState<Product[]>(db.getProducts());
   const [editing, setEditing] = useState<Product | null>(null);
+  const [productImage, setProductImage] = useState('');
+
+  useEffect(() => {
+    if (editing) {
+      setProductImage(editing.imageUrl);
+    } else {
+      setProductImage('');
+    }
+  }, [editing]);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const base64 = await convertFileToBase64(file);
+        setProductImage(base64);
+      } catch (err) {
+        console.error("Image upload failed", err);
+        alert("Failed to upload image.");
+      }
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -304,7 +336,7 @@ const ProductsPanel = () => {
       description: formData.get('description') as string,
       price: Number(formData.get('price')),
       category: formData.get('category') as any,
-      imageUrl: formData.get('imageUrl') as string || 'https://picsum.photos/400/300',
+      imageUrl: productImage || formData.get('imageUrl') as string || 'https://picsum.photos/400/300',
       stock: Number(formData.get('stock')),
       createdAt: new Date().toISOString()
     };
@@ -318,6 +350,7 @@ const ProductsPanel = () => {
     db.saveProduct(newProduct);
     setProducts(db.getProducts());
     setEditing(null);
+    setProductImage('');
     e.currentTarget.reset();
   };
 
@@ -340,7 +373,27 @@ const ProductsPanel = () => {
           <option value="Gift Card">Gift Card</option>
           <option value="Prepaid Card">Prepaid Card</option>
         </select>
-        <input name="imageUrl" defaultValue={editing?.imageUrl} placeholder="Image URL (Optional)" className="bg-background border border-slate-600 rounded p-2 text-white" />
+        
+        {/* Image Upload Section */}
+        <div className="bg-background border border-slate-600 rounded p-2 flex items-center gap-2">
+            <input 
+              name="imageUrl" 
+              value={productImage} 
+              onChange={e => setProductImage(e.target.value)}
+              placeholder="Image URL" 
+              className="bg-transparent text-white outline-none flex-1 text-sm" 
+            />
+            <label className="cursor-pointer bg-slate-700 hover:bg-slate-600 p-2 rounded text-white" title="Upload Image">
+                <Upload size={16} />
+                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+            </label>
+        </div>
+        {productImage && (
+            <div className="md:col-span-2 flex justify-center bg-black/20 p-2 rounded">
+                <img src={productImage} alt="Preview" className="h-32 object-contain" />
+            </div>
+        )}
+
         <input name="stock" type="number" defaultValue={editing?.stock || 10} placeholder="Stock Qty" className="bg-background border border-slate-600 rounded p-2 text-white" />
         <textarea name="description" defaultValue={editing?.description} placeholder="Description" required className="md:col-span-2 bg-background border border-slate-600 rounded p-2 text-white h-20" />
         <div className="md:col-span-2">
@@ -349,7 +402,7 @@ const ProductsPanel = () => {
         </div>
         <div className="md:col-span-2 flex gap-2">
            <button type="submit" className="bg-primary text-white px-6 py-2 rounded hover:bg-indigo-600">{editing ? 'Update' : 'Create'}</button>
-           {editing && <button type="button" onClick={() => setEditing(null)} className="bg-slate-700 text-white px-6 py-2 rounded">Cancel</button>}
+           {editing && <button type="button" onClick={() => { setEditing(null); setProductImage(''); }} className="bg-slate-700 text-white px-6 py-2 rounded">Cancel</button>}
         </div>
       </form>
 
@@ -383,6 +436,19 @@ const SettingsPanel = () => {
     alert("Payment settings updated!");
   };
 
+  const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const base64 = await convertFileToBase64(file);
+        setSettings({ ...settings, upiQrUrl: base64 });
+      } catch (err) {
+        console.error(err);
+        alert("Failed to upload QR image");
+      }
+    }
+  };
+
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">Payment Settings</h2>
@@ -396,13 +462,24 @@ const SettingsPanel = () => {
            />
         </div>
         <div>
-           <label className="block mb-1 text-slate-400">UPI QR Image URL</label>
-           <input 
-             value={settings.upiQrUrl} 
-             onChange={e => setSettings({...settings, upiQrUrl: e.target.value})}
-             className="w-full bg-background border border-slate-600 rounded p-2 text-white" 
-           />
-           <img src={settings.upiQrUrl} alt="Preview" className="w-32 h-32 mt-2 object-contain bg-white rounded p-2" />
+           <label className="block mb-1 text-slate-400">UPI QR Image</label>
+           <div className="flex gap-2">
+               <input 
+                 value={settings.upiQrUrl} 
+                 onChange={e => setSettings({...settings, upiQrUrl: e.target.value})}
+                 className="w-full bg-background border border-slate-600 rounded p-2 text-white" 
+                 placeholder="Image URL or Upload"
+               />
+               <label className="cursor-pointer bg-slate-700 hover:bg-slate-600 p-2 rounded text-white flex items-center justify-center min-w-[44px]" title="Upload QR">
+                    <Upload size={18} />
+                    <input type="file" accept="image/*" onChange={handleQrUpload} className="hidden" />
+               </label>
+           </div>
+           {settings.upiQrUrl && (
+             <div className="mt-2 bg-white rounded p-2 w-fit">
+                <img src={settings.upiQrUrl} alt="Preview" className="w-32 h-32 object-contain" />
+             </div>
+           )}
         </div>
         <div>
            <label className="block mb-1 text-slate-400">Payment Instructions / Note</label>
