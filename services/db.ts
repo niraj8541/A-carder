@@ -229,6 +229,8 @@ export const db = {
   
   saveSettings: (settings: GlobalSettings) => {
     localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
+    // Dispatch event so other components know to update immediately
+    window.dispatchEvent(new Event('settings-updated'));
   },
 
   // Coupons

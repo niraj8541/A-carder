@@ -58,7 +58,8 @@ export const AdminDashboard: React.FC = () => {
 };
 
 // --- Helper for file upload & compression ---
-const compressImage = (file: File, maxWidth = 600, quality = 0.8): Promise<string> => {
+// Updated to be more aggressive with compression to ensure it fits in localStorage
+const compressImage = (file: File, maxWidth = 400, quality = 0.7): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -80,7 +81,7 @@ const compressImage = (file: File, maxWidth = 600, quality = 0.8): Promise<strin
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', quality)); // Compress as JPEG
+          resolve(canvas.toDataURL('image/jpeg', quality)); // Compress as JPEG with 0.7 quality
         } else {
             reject(new Error("Canvas context failed"));
         }

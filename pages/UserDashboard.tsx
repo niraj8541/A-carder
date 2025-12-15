@@ -1,19 +1,39 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/db';
-import { Order, Transaction } from '../types';
+import { Order, Transaction, GlobalSettings } from '../types';
 import { Wallet, Package, Clock, CheckCircle, XCircle, FileText, Upload } from 'lucide-react';
 
 export const UserDashboard: React.FC = () => {
   const { user, refreshUser } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [settings, setSettings] = useState(db.getSettings());
+  const [settings, setSettings] = useState<GlobalSettings>(db.getSettings());
   const [activeTab, setActiveTab] = useState<'orders' | 'wallet'>('orders');
   
   // Wallet Add Money State
   const [amount, setAmount] = useState('');
   const [txnId, setTxnId] = useState('');
+
+  // Setup listeners for settings updates
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      setSettings(db.getSettings());
+    };
+    
+    // Listen for custom event from db.saveSettings (same window)
+    window.addEventListener('settings-updated', handleSettingsUpdate);
+    // Listen for storage event (cross-tab/window)
+    window.addEventListener('storage', handleSettingsUpdate);
+
+    // Initial fetch
+    handleSettingsUpdate();
+
+    return () => {
+      window.removeEventListener('settings-updated', handleSettingsUpdate);
+      window.removeEventListener('storage', handleSettingsUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -24,13 +44,6 @@ export const UserDashboard: React.FC = () => {
       setTransactions(allTxns.filter(t => t.userId === user.id).reverse());
     }
   }, [user]);
-
-  // Force refresh settings when tab changes to wallet to ensure latest QR/UPI
-  useEffect(() => {
-    if (activeTab === 'wallet') {
-      setSettings(db.getSettings());
-    }
-  }, [activeTab]);
 
   const handleAddMoney = (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,7 +151,19 @@ export const UserDashboard: React.FC = () => {
             <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Wallet className="text-primary"/> Add Funds</h3>
             
             <div className="flex flex-col items-center justify-center mb-6 bg-white p-4 rounded-xl w-max mx-auto">
-               <img src={settings.upiQrUrl} alt="UPI QR" className="w-48 h-48 object-contain" />
+               {/* QR Display */}
+               {settings.upiQrUrl ? (
+                 <img 
+                   src={settings.upiQrUrl} 
+                   alt="UPI QR" 
+                   className="w-48 h-48 object-contain"
+                   onError={(e) => {
+                     (e.target as HTMLImageElement).style.display = 'none';
+                   }} 
+                 />
+               ) : (
+                 <div className="w-48 h-48 flex items-center justify-center bg-gray-200 text-gray-500 text-sm">No QR Code</div>
+               )}
                <p className="text-black font-mono font-bold mt-2 text-sm">{settings.upiId}</p>
             </div>
             
