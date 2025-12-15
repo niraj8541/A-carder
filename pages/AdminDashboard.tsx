@@ -407,7 +407,8 @@ const ProductsPanel = () => {
               placeholder="Image URL" 
               className="bg-transparent text-white outline-none flex-1 text-sm" 
             />
-            <label className="cursor-pointer bg-slate-700 hover:bg-slate-600 p-2 rounded text-white" title="Upload Image">
+            {/* UPDATED: Fixed width and height for product upload button */}
+            <label className="cursor-pointer bg-slate-700 hover:bg-slate-600 h-8 w-8 flex items-center justify-center rounded text-white" title="Upload Image">
                 <Upload size={16} />
                 <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
             </label>
@@ -507,10 +508,11 @@ const SettingsPanel = () => {
                <input 
                  value={settings.upiQrUrl} 
                  onChange={e => setSettings({...settings, upiQrUrl: e.target.value})}
-                 className="w-full bg-background border border-slate-600 rounded p-2 text-white" 
+                 className="flex-1 bg-background border border-slate-600 rounded p-2 text-white" 
                  placeholder="Image URL or Upload"
                />
-               <label className="cursor-pointer bg-slate-700 hover:bg-slate-600 p-2 rounded text-white flex items-center justify-center min-w-[44px]" title="Upload QR (Auto-saves)">
+               {/* UPDATED: Fixed width and height for QR upload button */}
+               <label className="cursor-pointer bg-slate-700 hover:bg-slate-600 w-10 h-10 flex items-center justify-center rounded text-white flex-shrink-0" title="Upload QR (Auto-saves)">
                     <Upload size={18} />
                     <input type="file" accept="image/*" onChange={handleQrUpload} className="hidden" />
                </label>
