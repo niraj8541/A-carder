@@ -58,8 +58,8 @@ export const AdminDashboard: React.FC = () => {
 };
 
 // --- Helper for file upload & compression ---
-// Heavily compressed to ensure it fits in localStorage (Max 250px width, 0.5 quality)
-const compressImage = (file: File, maxWidth = 250, quality = 0.5): Promise<string> => {
+// Heavily compressed: Max 200px width, 0.5 quality to ensure it fits in localStorage
+const compressImage = (file: File, maxWidth = 200, quality = 0.5): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -101,13 +101,17 @@ const OrdersPanel = () => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
 
-    if (status === 'approved' && !content) {
-        content = prompt("Enter the Card Code / PDF Link / Secret Content for this user:") || "Unlocked";
-    }
+    try {
+        if (status === 'approved' && !content) {
+            content = prompt("Enter the Card Code / PDF Link / Secret Content for this user:") || "Unlocked";
+        }
 
-    const updatedOrder = { ...order, status, unlockedContent: content };
-    db.updateOrder(updatedOrder);
-    setOrders(db.getOrders().reverse());
+        const updatedOrder = { ...order, status, unlockedContent: content };
+        db.updateOrder(updatedOrder);
+        setOrders(db.getOrders().reverse());
+    } catch(e: any) {
+        alert(e.message);
+    }
   };
 
   return (
@@ -187,15 +191,23 @@ const PaymentsPanel = () => {
 
   const handleApprove = (txnId: string) => {
     if (window.confirm("Confirm Payment Receipt? This will add funds to user wallet.")) {
-      db.approveDeposit(txnId);
-      refresh();
+      try {
+        db.approveDeposit(txnId);
+        refresh();
+      } catch(e: any) {
+        alert(e.message);
+      }
     }
   };
 
   const handleReject = (txnId: string) => {
     if (window.confirm("Reject this payment request?")) {
-      db.rejectDeposit(txnId);
-      refresh();
+      try {
+        db.rejectDeposit(txnId);
+        refresh();
+      } catch(e: any) {
+        alert(e.message);
+      }
     }
   };
 
@@ -249,24 +261,36 @@ const UsersPanel = ({ isSuperAdmin }: { isSuperAdmin: boolean }) => {
   const handleWallet = (userId: string) => {
     const amount = prompt("Enter amount to ADD (positive) or DEDUCT (negative):");
     if (amount) {
-        db.updateUserWallet(userId, Number(amount), "Admin Adjustment", 'admin_adjustment');
-        refresh();
+        try {
+            db.updateUserWallet(userId, Number(amount), "Admin Adjustment", 'admin_adjustment');
+            refresh();
+        } catch(e: any) {
+            alert(e.message);
+        }
     }
   };
 
   const toggleBan = (user: User) => {
     if (user.role === UserRole.SUPER_ADMIN) return;
     const updated = { ...user, isBanned: !user.isBanned };
-    db.saveUser(updated);
-    refresh();
+    try {
+        db.saveUser(updated);
+        refresh();
+    } catch(e: any) {
+        alert(e.message);
+    }
   };
 
   const toggleAdmin = (user: User) => {
     if (!isSuperAdmin || user.role === UserRole.SUPER_ADMIN) return;
     const newRole = user.role === UserRole.ADMIN ? UserRole.USER : UserRole.ADMIN;
     const updated = { ...user, role: newRole };
-    db.saveUser(updated);
-    refresh();
+    try {
+        db.saveUser(updated);
+        refresh();
+    } catch(e: any) {
+        alert(e.message);
+    }
   };
 
   return (
@@ -331,6 +355,7 @@ const ProductsPanel = () => {
   const [editing, setEditing] = useState<Product | null>(null);
   const [productImage, setProductImage] = useState('');
 
+  // When editing mode changes, update the image state.
   useEffect(() => {
     if (editing) {
       setProductImage(editing.imageUrl);
@@ -344,10 +369,10 @@ const ProductsPanel = () => {
     if (file) {
       try {
         const base64 = await compressImage(file);
-        setProductImage(base64);
+        setProductImage(base64); // This base64 string will now definitely be used in handleSubmit
       } catch (err) {
         console.error("Image upload failed", err);
-        alert("Failed to upload image. It might be too large or invalid.");
+        alert("Failed to upload image.");
       }
     }
   };
@@ -355,13 +380,24 @@ const ProductsPanel = () => {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    
+    // Default to a static placeholder instead of picsum random
+    const defaultPlaceholder = 'https://placehold.co/600x400/252f3f/ffffff?text=Product+Image';
+    
+    // Priority: 1. State (uploaded file) 2. Input text 3. Default
+    // Note: formData.get('imageUrl') will catch the text input. 
+    // However, if we uploaded a file, productImage is set. 
+    // The text input might be empty if user uploaded file, OR it might contain the base64 if we bound it (we didn't bind value, we bound state).
+    
+    const finalImage = productImage || (formData.get('imageUrl') as string) || defaultPlaceholder;
+
     const newProduct: Product = {
       id: editing ? editing.id : Date.now().toString(),
       name: formData.get('name') as string,
       description: formData.get('description') as string,
       price: Number(formData.get('price')),
       category: formData.get('category') as any,
-      imageUrl: productImage || formData.get('imageUrl') as string || 'https://picsum.photos/400/300',
+      imageUrl: finalImage,
       stock: Number(formData.get('stock')),
       createdAt: new Date().toISOString()
     };
@@ -369,20 +405,25 @@ const ProductsPanel = () => {
     try {
       db.saveProduct(newProduct);
       setProducts(db.getProducts());
-      // Only reset after successful save
+      
+      // Reset form
       setEditing(null);
       setProductImage('');
       e.currentTarget.reset();
-    } catch (error) {
+    } catch (error: any) {
        console.error(error);
-       alert("CRITICAL ERROR: Storage is full! Delete old products or use smaller images. Product NOT saved.");
+       alert(error.message || "Error saving product.");
     }
   };
 
   const handleDelete = (id: string) => {
     if (window.confirm("Delete this product?")) {
-      db.deleteProduct(id);
-      setProducts(db.getProducts());
+      try {
+        db.deleteProduct(id);
+        setProducts(db.getProducts());
+      } catch(e: any) {
+        alert(e.message);
+      }
     }
   };
 
@@ -461,9 +502,9 @@ const SettingsPanel = () => {
     try {
       db.saveSettings(settings);
       alert("Payment settings updated!");
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Failed to save settings. Local storage might be full. Try a smaller image.");
+      alert(error.message);
     }
   };
 
@@ -482,7 +523,7 @@ const SettingsPanel = () => {
             // If success, update UI state
             setSettings(updatedSettings);
             alert("QR Code updated and saved successfully!");
-        } catch(e) {
+        } catch(e: any) {
             // If failure, do NOT update UI, let user know
             console.error(e);
             alert("CRITICAL ERROR: Storage is full! The image could not be saved. Please remove old products or use a smaller image.");
@@ -502,8 +543,12 @@ const SettingsPanel = () => {
               upiQrUrl: '',
               paymentNote: 'Scan and pay.'
           };
-          db.saveSettings(defaults);
-          setSettings(defaults);
+          try {
+            db.saveSettings(defaults);
+            setSettings(defaults);
+          } catch(e: any) {
+             alert(e.message); 
+          }
       }
   };
 
@@ -564,10 +609,14 @@ const CouponsPanel = () => {
 
   const addCoupon = (e: React.FormEvent) => {
     e.preventDefault();
-    db.saveCoupon({ code: newCode, discountAmount: Number(amount), isActive: true });
-    setCoupons(db.getCoupons());
-    setNewCode('');
-    setAmount('');
+    try {
+        db.saveCoupon({ code: newCode, discountAmount: Number(amount), isActive: true });
+        setCoupons(db.getCoupons());
+        setNewCode('');
+        setAmount('');
+    } catch(e: any) {
+        alert(e.message);
+    }
   };
 
   return (

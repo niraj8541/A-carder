@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/db';
 import { Order, Transaction, GlobalSettings } from '../types';
-import { Wallet, Package, Clock, CheckCircle, XCircle, FileText, Upload, ImageOff, Maximize2, Copy, ScanLine } from 'lucide-react';
+import { Wallet, Package, Clock, CheckCircle, XCircle, FileText, Upload, ImageOff, Maximize2, Copy, ScanLine, RefreshCcw } from 'lucide-react';
 
 export const UserDashboard: React.FC = () => {
   const { user, refreshUser } = useAuth();
@@ -10,7 +10,6 @@ export const UserDashboard: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [settings, setSettings] = useState<GlobalSettings>(db.getSettings());
   const [activeTab, setActiveTab] = useState<'orders' | 'wallet'>('orders');
-  const [qrError, setQrError] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
   
   // Wallet Add Money State
@@ -21,7 +20,6 @@ export const UserDashboard: React.FC = () => {
   useEffect(() => {
     const handleSettingsUpdate = () => {
       setSettings(db.getSettings());
-      setQrError(false); // Reset error state on new settings
     };
     
     // Listen for custom event from db.saveSettings (same window)
@@ -42,7 +40,6 @@ export const UserDashboard: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'wallet') {
       setSettings(db.getSettings());
-      setQrError(false);
     }
   }, [activeTab]);
 
@@ -60,21 +57,30 @@ export const UserDashboard: React.FC = () => {
     e.preventDefault();
     if (!user) return;
     
-    // Create Pending Request
-    db.createDepositRequest(user.id, Number(amount), txnId);
-    
-    alert("Request Submitted! Admin will verify your transaction and update your wallet.");
-    setAmount('');
-    setTxnId('');
-    
-    // Refresh local lists
-    const allTxns = db.getTransactions();
-    setTransactions(allTxns.filter(t => t.userId === user.id).reverse());
+    try {
+        // Create Pending Request
+        db.createDepositRequest(user.id, Number(amount), txnId);
+        
+        alert("Request Submitted! Admin will verify your transaction and update your wallet.");
+        setAmount('');
+        setTxnId('');
+        
+        // Refresh local lists
+        const allTxns = db.getTransactions();
+        setTransactions(allTxns.filter(t => t.userId === user.id).reverse());
+    } catch(e: any) {
+        alert(e.message);
+    }
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     alert("UPI ID Copied to clipboard!");
+  };
+
+  const manualRefresh = () => {
+    setSettings(db.getSettings());
+    refreshUser();
   };
 
   if (!user) return null;
@@ -92,9 +98,14 @@ export const UserDashboard: React.FC = () => {
             <p className="text-slate-400 font-mono">{user.phone}</p>
           </div>
         </div>
-        <div className="bg-black/30 p-4 rounded-xl border border-slate-700 min-w-[200px] text-center">
-          <p className="text-slate-400 text-sm mb-1">Wallet Balance</p>
-          <p className="text-3xl font-bold text-secondary">₹{user.walletBalance.toLocaleString()}</p>
+        <div className="flex items-center gap-4">
+            <div className="bg-black/30 p-4 rounded-xl border border-slate-700 min-w-[200px] text-center">
+              <p className="text-slate-400 text-sm mb-1">Wallet Balance</p>
+              <p className="text-3xl font-bold text-secondary">₹{user.walletBalance.toLocaleString()}</p>
+            </div>
+            <button onClick={manualRefresh} className="p-2 bg-slate-800 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white transition-colors" title="Refresh Data">
+                <RefreshCcw size={18} />
+            </button>
         </div>
       </div>
 
@@ -169,7 +180,7 @@ export const UserDashboard: React.FC = () => {
             {/* Clickable QR Card */}
             <div 
               onClick={() => {
-                if (settings.upiQrUrl && !qrError) setQrModalOpen(true);
+                if (settings.upiQrUrl) setQrModalOpen(true);
               }}
               className="group cursor-pointer flex flex-col items-center justify-center mb-6 bg-white p-4 rounded-xl w-max mx-auto overflow-hidden relative shadow-lg hover:shadow-2xl hover:scale-105 transition-all duration-300"
             >
@@ -186,12 +197,11 @@ export const UserDashboard: React.FC = () => {
 
                {/* QR Display */}
                <div className="mt-2">
-               {settings.upiQrUrl && !qrError ? (
+               {settings.upiQrUrl ? (
                  <img 
                    src={settings.upiQrUrl} 
                    alt="UPI QR" 
                    className="w-48 h-48 object-contain mix-blend-multiply"
-                   onError={() => setQrError(true)} 
                  />
                ) : (
                  <div className="w-48 h-48 flex flex-col items-center justify-center bg-gray-100 text-slate-800 text-sm p-4 text-center">

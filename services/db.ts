@@ -22,6 +22,16 @@ const DEFAULT_SETTINGS: GlobalSettings = {
   paymentNote: 'Scan and pay. Mention your username in remarks.'
 };
 
+// Helper for safe storage
+const safeSetItem = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    console.error("LocalStorage Limit Exceeded", e);
+    throw new Error("Storage Limit Exceeded! Cannot save data. Please delete old products or images.");
+  }
+};
+
 export const db = {
   init: () => {
     // 1. Ensure Super Admin exists or is updated with latest credentials
@@ -46,21 +56,22 @@ export const db = {
       users.push(superAdmin); // Create new
       console.log('[DB] Super Admin initialized.');
     }
-    localStorage.setItem(KEYS.USERS, JSON.stringify(users));
+    safeSetItem(KEYS.USERS, JSON.stringify(users));
 
     // 2. Default Settings
     if (!localStorage.getItem(KEYS.SETTINGS)) {
       // Use a placeholder if initializing from scratch
       const initialSettings = {
         ...DEFAULT_SETTINGS,
-        upiQrUrl: 'https://picsum.photos/300/300?grayscale'
+        // Use a generic placeholder
+        upiQrUrl: ''
       };
-      localStorage.setItem(KEYS.SETTINGS, JSON.stringify(initialSettings));
+      safeSetItem(KEYS.SETTINGS, JSON.stringify(initialSettings));
     }
 
     // 3. Default Products
     if (!localStorage.getItem(KEYS.PRODUCTS)) {
-      // Seed some dummy products
+      // Seed some dummy products with STATIC images to prevent "different image" issue
       const products: Product[] = [
         {
           id: 'p1',
@@ -68,7 +79,7 @@ export const db = {
           description: 'Valid for 1 year. Instant redemption.',
           price: 500,
           category: 'Gift Card',
-          imageUrl: 'https://picsum.photos/400/300?random=1',
+          imageUrl: 'https://placehold.co/600x400/252f3f/ffffff?text=Amazon+Card', // Static placeholder
           stock: 10,
           createdAt: new Date().toISOString()
         },
@@ -78,17 +89,17 @@ export const db = {
           description: 'Use anywhere Visa is accepted online.',
           price: 1050, // Slight markup
           category: 'Prepaid Card',
-          imageUrl: 'https://picsum.photos/400/300?random=2',
+          imageUrl: 'https://placehold.co/600x400/10b981/ffffff?text=Visa+Prepaid', // Static placeholder
           stock: 5,
           createdAt: new Date().toISOString()
         }
       ];
-      localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(products));
+      safeSetItem(KEYS.PRODUCTS, JSON.stringify(products));
     }
 
     // 4. Coupons
     if (!localStorage.getItem(KEYS.COUPONS)) {
-      localStorage.setItem(KEYS.COUPONS, JSON.stringify([]));
+      safeSetItem(KEYS.COUPONS, JSON.stringify([]));
     }
   },
 
@@ -103,7 +114,7 @@ export const db = {
     } else {
       users.push(user);
     }
-    localStorage.setItem(KEYS.USERS, JSON.stringify(users));
+    safeSetItem(KEYS.USERS, JSON.stringify(users));
   },
 
   findUserByUsername: (username: string): User | undefined => {
@@ -116,7 +127,7 @@ export const db = {
     if (userIndex === -1) return;
 
     users[userIndex].walletBalance += amount;
-    localStorage.setItem(KEYS.USERS, JSON.stringify(users));
+    safeSetItem(KEYS.USERS, JSON.stringify(users));
 
     // Record Transaction
     const transactions: Transaction[] = JSON.parse(localStorage.getItem(KEYS.TRANSACTIONS) || '[]');
@@ -129,7 +140,7 @@ export const db = {
       date: new Date().toISOString(),
       status: 'success'
     });
-    localStorage.setItem(KEYS.TRANSACTIONS, JSON.stringify(transactions));
+    safeSetItem(KEYS.TRANSACTIONS, JSON.stringify(transactions));
   },
 
   // NEW: Deposit Request Flow
@@ -146,7 +157,7 @@ export const db = {
       status: 'pending'
     };
     transactions.push(newTxn);
-    localStorage.setItem(KEYS.TRANSACTIONS, JSON.stringify(transactions));
+    safeSetItem(KEYS.TRANSACTIONS, JSON.stringify(transactions));
     return newTxn;
   },
 
@@ -161,14 +172,14 @@ export const db = {
     // 1. Update Transaction Status
     txn.status = 'success';
     transactions[txnIndex] = txn;
-    localStorage.setItem(KEYS.TRANSACTIONS, JSON.stringify(transactions));
+    safeSetItem(KEYS.TRANSACTIONS, JSON.stringify(transactions));
 
     // 2. Credit Wallet
     const users = db.getUsers();
     const userIndex = users.findIndex(u => u.id === txn.userId);
     if (userIndex !== -1) {
       users[userIndex].walletBalance += txn.amount;
-      localStorage.setItem(KEYS.USERS, JSON.stringify(users));
+      safeSetItem(KEYS.USERS, JSON.stringify(users));
     }
     return true;
   },
@@ -179,7 +190,7 @@ export const db = {
     if (txnIndex === -1) return false;
     
     transactions[txnIndex].status = 'failed';
-    localStorage.setItem(KEYS.TRANSACTIONS, JSON.stringify(transactions));
+    safeSetItem(KEYS.TRANSACTIONS, JSON.stringify(transactions));
     return true;
   },
 
@@ -194,12 +205,12 @@ export const db = {
     } else {
       products.push(product);
     }
-    localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(products));
+    safeSetItem(KEYS.PRODUCTS, JSON.stringify(products));
   },
 
   deleteProduct: (id: string) => {
     const products = db.getProducts().filter(p => p.id !== id);
-    localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(products));
+    safeSetItem(KEYS.PRODUCTS, JSON.stringify(products));
   },
 
   // Order Methods
@@ -215,7 +226,7 @@ export const db = {
       purchaseDate: new Date().toISOString()
     };
     orders.push(newOrder);
-    localStorage.setItem(KEYS.ORDERS, JSON.stringify(orders));
+    safeSetItem(KEYS.ORDERS, JSON.stringify(orders));
     return newOrder;
   },
 
@@ -226,7 +237,7 @@ export const db = {
     const index = orders.findIndex(o => o.id === order.id);
     if (index >= 0) {
       orders[index] = order;
-      localStorage.setItem(KEYS.ORDERS, JSON.stringify(orders));
+      safeSetItem(KEYS.ORDERS, JSON.stringify(orders));
     }
   },
 
@@ -237,12 +248,13 @@ export const db = {
       // Merge with defaults to ensure keys like upiId always exist
       return { ...DEFAULT_SETTINGS, ...stored };
     } catch (e) {
+      // If parsing fails, return defaults but DO NOT overwrite potentially valid (but malformed) data immediately
       return DEFAULT_SETTINGS;
     }
   },
   
   saveSettings: (settings: GlobalSettings) => {
-    localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
+    safeSetItem(KEYS.SETTINGS, JSON.stringify(settings));
     // Dispatch event so other components know to update immediately
     window.dispatchEvent(new Event('settings-updated'));
   },
@@ -253,11 +265,15 @@ export const db = {
   saveCoupon: (coupon: Coupon) => {
     const coupons = db.getCoupons();
     coupons.push(coupon);
-    localStorage.setItem(KEYS.COUPONS, JSON.stringify(coupons));
+    safeSetItem(KEYS.COUPONS, JSON.stringify(coupons));
   },
 
   getTransactions: (): Transaction[] => JSON.parse(localStorage.getItem(KEYS.TRANSACTIONS) || '[]'),
 };
 
 // Initialize on load
-db.init();
+try {
+    db.init();
+} catch(e) {
+    console.error("DB Initialization failed", e);
+}
