@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/db';
-import { User, Product, Order, GlobalSettings, UserRole, Coupon } from '../types';
+import { User, Product, Order, GlobalSettings, UserRole, Coupon, Transaction } from '../types';
 import { useNavigate } from 'react-router-dom';
-import { Users, ShoppingBag, ClipboardList, Settings, Ticket, Check, X, Search, Trash2, Edit2, Plus, Ban, Unlock } from 'lucide-react';
+import { Users, ShoppingBag, ClipboardList, Settings, Ticket, Check, X, Search, Trash2, Edit2, Plus, Ban, Unlock, Wallet } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
   const { user, isAdmin, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'orders' | 'settings' | 'coupons'>('orders');
+  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'orders' | 'settings' | 'coupons' | 'payments'>('orders');
 
   // Check auth
   useEffect(() => {
@@ -25,6 +25,9 @@ export const AdminDashboard: React.FC = () => {
            <h2 className="font-bold text-slate-400 text-xs uppercase tracking-wider mb-2">Admin Menu</h2>
            <button onClick={() => setActiveTab('orders')} className={`w-full text-left px-4 py-3 rounded-lg mb-1 flex items-center gap-3 transition-colors ${activeTab === 'orders' ? 'bg-primary text-white' : 'text-slate-400 hover:bg-slate-800'}`}>
              <ClipboardList size={18} /> Orders
+           </button>
+           <button onClick={() => setActiveTab('payments')} className={`w-full text-left px-4 py-3 rounded-lg mb-1 flex items-center gap-3 transition-colors ${activeTab === 'payments' ? 'bg-primary text-white' : 'text-slate-400 hover:bg-slate-800'}`}>
+             <Wallet size={18} /> Payment Requests
            </button>
            <button onClick={() => setActiveTab('users')} className={`w-full text-left px-4 py-3 rounded-lg mb-1 flex items-center gap-3 transition-colors ${activeTab === 'users' ? 'bg-primary text-white' : 'text-slate-400 hover:bg-slate-800'}`}>
              <Users size={18} /> Users
@@ -44,6 +47,7 @@ export const AdminDashboard: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 bg-surface rounded-2xl border border-slate-700 p-6 min-h-[600px]">
         {activeTab === 'orders' && <OrdersPanel />}
+        {activeTab === 'payments' && <PaymentsPanel />}
         {activeTab === 'users' && <UsersPanel isSuperAdmin={isSuperAdmin} />}
         {activeTab === 'products' && <ProductsPanel />}
         {activeTab === 'coupons' && <CouponsPanel />}
@@ -120,6 +124,80 @@ const OrdersPanel = () => {
           </tbody>
         </table>
         {orders.length === 0 && <p className="text-center text-slate-500 mt-8">No orders found.</p>}
+      </div>
+    </div>
+  );
+};
+
+const PaymentsPanel = () => {
+  const [deposits, setDeposits] = useState<Transaction[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  const refresh = () => {
+    const all = db.getTransactions();
+    // Filter for deposit requests that are pending
+    const pendingDeposits = all.filter(t => t.type === 'deposit' && t.status === 'pending').reverse();
+    setDeposits(pendingDeposits);
+    setUsers(db.getUsers());
+  };
+
+  const getUserDetails = (userId: string) => {
+    const u = users.find(u => u.id === userId);
+    return u ? `${u.username} (${u.phone})` : userId;
+  };
+
+  const handleApprove = (txnId: string) => {
+    if (window.confirm("Confirm Payment Receipt? This will add funds to user wallet.")) {
+      db.approveDeposit(txnId);
+      refresh();
+    }
+  };
+
+  const handleReject = (txnId: string) => {
+    if (window.confirm("Reject this payment request?")) {
+      db.rejectDeposit(txnId);
+      refresh();
+    }
+  };
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-6">Pending Payment Requests</h2>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="text-slate-400 text-sm border-b border-slate-700">
+              <th className="p-3">User</th>
+              <th className="p-3">Amount</th>
+              <th className="p-3">UTR / Ref ID</th>
+              <th className="p-3">Date</th>
+              <th className="p-3">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {deposits.map(txn => (
+              <tr key={txn.id} className="border-b border-slate-700/50 hover:bg-slate-800/50">
+                <td className="p-3 text-sm">{getUserDetails(txn.userId)}</td>
+                <td className="p-3 font-bold text-green-400">₹{txn.amount}</td>
+                <td className="p-3 font-mono text-sm">{txn.utr || "N/A"}</td>
+                <td className="p-3 text-xs text-slate-400">{new Date(txn.date).toLocaleString()}</td>
+                <td className="p-3 flex gap-2">
+                  <button onClick={() => handleApprove(txn.id)} className="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
+                    <Check size={14} /> Approve
+                  </button>
+                  <button onClick={() => handleReject(txn.id)} className="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
+                    <X size={14} /> Reject
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {deposits.length === 0 && <p className="text-center text-slate-500 mt-8">No pending payment requests.</p>}
       </div>
     </div>
   );
@@ -231,7 +309,6 @@ const ProductsPanel = () => {
       createdAt: new Date().toISOString()
     };
     
-    // Simulate "File Upload" by just alerting
     const fileInput = (e.currentTarget.elements.namedItem('pdfFile') as HTMLInputElement);
     if (fileInput.files?.length) {
       alert("Simulated PDF Upload: File attached to product securely.");

@@ -44,6 +44,7 @@ export interface Transaction {
   type: 'deposit' | 'purchase' | 'refund' | 'admin_adjustment';
   amount: number;
   description: string;
+  utr?: string;
   date: string;
   status: 'success' | 'pending' | 'failed';
 }

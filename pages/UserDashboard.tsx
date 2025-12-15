@@ -29,16 +29,10 @@ export const UserDashboard: React.FC = () => {
     e.preventDefault();
     if (!user) return;
     
-    // Simulate Admin Processing: In a real app, this would be a request. 
-    // For this demo, we'll simulate a "Manual Request" that instantly adds funds 
-    // BUT typically an admin would verify the transaction ID.
-    // I will auto-approve for demo convenience or leave it as a request?
-    // Let's make it a request that the user sees as "Pending" or just auto-add for UX smoothness in demo.
-    // Let's auto-add to simulate "Prepaid/Gateway" success for the demo flow.
+    // Create Pending Request
+    db.createDepositRequest(user.id, Number(amount), txnId);
     
-    db.updateUserWallet(user.id, Number(amount), `UPI Load: ${txnId}`, 'deposit');
-    refreshUser();
-    alert("Funds added successfully (simulated)!");
+    alert("Request Submitted! Admin will verify your transaction and update your wallet.");
     setAmount('');
     setTxnId('');
     
@@ -170,7 +164,7 @@ export const UserDashboard: React.FC = () => {
                 />
               </div>
               <button type="submit" className="w-full bg-secondary hover:bg-emerald-600 text-black font-bold py-3 rounded-lg transition-all">
-                Verify & Add Balance
+                Request Deposit
               </button>
             </form>
           </div>
@@ -182,10 +176,10 @@ export const UserDashboard: React.FC = () => {
               {transactions.map(txn => (
                 <div key={txn.id} className="flex justify-between items-center p-3 rounded-lg bg-background/50 border border-slate-800">
                   <div className="flex items-center gap-3">
-                    {txn.type === 'deposit' ? <Upload size={16} className="text-green-500"/> : <Package size={16} className="text-blue-500"/>}
+                    {txn.type === 'deposit' ? <Upload size={16} className={txn.status === 'success' ? "text-green-500" : "text-yellow-500"}/> : <Package size={16} className="text-blue-500"/>}
                     <div>
                       <p className="text-sm font-medium text-slate-200">{txn.description}</p>
-                      <p className="text-xs text-slate-500">{new Date(txn.date).toLocaleDateString()}</p>
+                      <p className="text-xs text-slate-500">{new Date(txn.date).toLocaleDateString()} • <span className={`uppercase ${txn.status === 'success' ? 'text-green-500' : txn.status === 'failed' ? 'text-red-500' : 'text-yellow-500'}`}>{txn.status}</span></p>
                     </div>
                   </div>
                   <span className={`font-mono font-bold ${txn.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>

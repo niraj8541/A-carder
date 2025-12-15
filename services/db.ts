@@ -126,6 +126,57 @@ export const db = {
     localStorage.setItem(KEYS.TRANSACTIONS, JSON.stringify(transactions));
   },
 
+  // NEW: Deposit Request Flow
+  createDepositRequest: (userId: string, amount: number, utr: string) => {
+    const transactions: Transaction[] = JSON.parse(localStorage.getItem(KEYS.TRANSACTIONS) || '[]');
+    const newTxn: Transaction = {
+      id: 'txn-' + Date.now(),
+      userId,
+      type: 'deposit',
+      amount,
+      description: `UPI Load: ${utr}`,
+      utr,
+      date: new Date().toISOString(),
+      status: 'pending'
+    };
+    transactions.push(newTxn);
+    localStorage.setItem(KEYS.TRANSACTIONS, JSON.stringify(transactions));
+    return newTxn;
+  },
+
+  approveDeposit: (txnId: string) => {
+    const transactions: Transaction[] = db.getTransactions();
+    const txnIndex = transactions.findIndex(t => t.id === txnId);
+    if (txnIndex === -1) return false;
+    
+    const txn = transactions[txnIndex];
+    if (txn.status !== 'pending') return false;
+
+    // 1. Update Transaction Status
+    txn.status = 'success';
+    transactions[txnIndex] = txn;
+    localStorage.setItem(KEYS.TRANSACTIONS, JSON.stringify(transactions));
+
+    // 2. Credit Wallet
+    const users = db.getUsers();
+    const userIndex = users.findIndex(u => u.id === txn.userId);
+    if (userIndex !== -1) {
+      users[userIndex].walletBalance += txn.amount;
+      localStorage.setItem(KEYS.USERS, JSON.stringify(users));
+    }
+    return true;
+  },
+
+  rejectDeposit: (txnId: string) => {
+    const transactions: Transaction[] = db.getTransactions();
+    const txnIndex = transactions.findIndex(t => t.id === txnId);
+    if (txnIndex === -1) return false;
+    
+    transactions[txnIndex].status = 'failed';
+    localStorage.setItem(KEYS.TRANSACTIONS, JSON.stringify(transactions));
+    return true;
+  },
+
   // Product Methods
   getProducts: (): Product[] => JSON.parse(localStorage.getItem(KEYS.PRODUCTS) || '[]'),
   
