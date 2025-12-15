@@ -57,13 +57,37 @@ export const AdminDashboard: React.FC = () => {
   );
 };
 
-// --- Helper for file upload ---
-const convertFileToBase64 = (file: File): Promise<string> => {
+// --- Helper for file upload & compression ---
+const compressImage = (file: File, maxWidth = 600, quality = 0.8): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = error => reject(error);
     reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality)); // Compress as JPEG
+        } else {
+            reject(new Error("Canvas context failed"));
+        }
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
   });
 };
 
@@ -318,11 +342,11 @@ const ProductsPanel = () => {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const base64 = await convertFileToBase64(file);
+        const base64 = await compressImage(file);
         setProductImage(base64);
       } catch (err) {
         console.error("Image upload failed", err);
-        alert("Failed to upload image.");
+        alert("Failed to upload image. It might be too large or invalid.");
       }
     }
   };
@@ -341,17 +365,16 @@ const ProductsPanel = () => {
       createdAt: new Date().toISOString()
     };
     
-    const fileInput = (e.currentTarget.elements.namedItem('pdfFile') as HTMLInputElement);
-    if (fileInput.files?.length) {
-      alert("Simulated PDF Upload: File attached to product securely.");
-      newProduct.pdfUrl = "simulated_secure_path_" + newProduct.id + ".pdf";
+    try {
+      db.saveProduct(newProduct);
+      setProducts(db.getProducts());
+      setEditing(null);
+      setProductImage('');
+      e.currentTarget.reset();
+    } catch (error) {
+       console.error(error);
+       alert("Error saving product. Storage might be full.");
     }
-
-    db.saveProduct(newProduct);
-    setProducts(db.getProducts());
-    setEditing(null);
-    setProductImage('');
-    e.currentTarget.reset();
   };
 
   const handleDelete = (id: string) => {
@@ -432,15 +455,20 @@ const SettingsPanel = () => {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    db.saveSettings(settings);
-    alert("Payment settings updated!");
+    try {
+      db.saveSettings(settings);
+      alert("Payment settings updated!");
+    } catch (error) {
+      console.error(error);
+      alert("Failed to save settings. Local storage might be full. Try a smaller image.");
+    }
   };
 
   const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const base64 = await convertFileToBase64(file);
+        const base64 = await compressImage(file);
         setSettings({ ...settings, upiQrUrl: base64 });
       } catch (err) {
         console.error(err);

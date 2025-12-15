@@ -25,6 +25,13 @@ export const UserDashboard: React.FC = () => {
     }
   }, [user]);
 
+  // Force refresh settings when tab changes to wallet to ensure latest QR/UPI
+  useEffect(() => {
+    if (activeTab === 'wallet') {
+      setSettings(db.getSettings());
+    }
+  }, [activeTab]);
+
   const handleAddMoney = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
