@@ -1,10 +1,23 @@
+import { supabase } from "../supabase";
 import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/db';
 import { User, Product, Order, GlobalSettings, UserRole, Coupon, Transaction } from '../types';
 import { useHistory } from 'react-router-dom';
 import { Users, ShoppingBag, ClipboardList, Settings, Ticket, Check, X, Search, Trash2, Edit2, Plus, Ban, Unlock, Wallet, Upload, Image as ImageIcon } from 'lucide-react';
+async function uploadImage(file: File) {
+  const fileName = Date.now() + "-" + file.name;
 
+  await supabase.storage
+    .from("uploads") // bucket name
+    .upload(fileName, file);
+
+  const image = supabase.storage
+    .from("uploads")
+    .getPublicUrl(fileName);
+
+  return image.data.publicUrl;
+}
 export const AdminDashboard: React.FC = () => {
   const { user, isAdmin, isSuperAdmin } = useAuth();
   const history = useHistory();
@@ -465,7 +478,19 @@ const ProductsPanel = () => {
         <textarea name="description" defaultValue={editing?.description} placeholder="Description" required className="md:col-span-2 bg-background border border-slate-600 rounded p-2 text-white h-20" />
         <div className="md:col-span-2">
             <label className="block text-sm text-slate-400 mb-1">Upload Product PDF / Assets (Locked until purchase)</label>
-            <input type="file" name="pdfFile" className="text-sm text-slate-400" />
+            <input
+  type="file"
+  name="pdfFile"
+  className="text-..."
+  onChange={async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const url = await uploadImage(file);
+    console.log("UPLOADED URL:", url);
+    alert("Upload successful");
+  }}
+ />
         </div>
         <div className="md:col-span-2 flex gap-2">
            <button type="submit" className="bg-primary text-white px-6 py-2 rounded hover:bg-indigo-600">{editing ? 'Update' : 'Create'}</button>
