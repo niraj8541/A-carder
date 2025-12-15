@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/db';
 import { Order, Transaction, GlobalSettings } from '../types';
-import { Wallet, Package, Clock, CheckCircle, XCircle, FileText, Upload } from 'lucide-react';
+import { Wallet, Package, Clock, CheckCircle, XCircle, FileText, Upload, ImageOff } from 'lucide-react';
 
 export const UserDashboard: React.FC = () => {
   const { user, refreshUser } = useAuth();
@@ -10,6 +10,7 @@ export const UserDashboard: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [settings, setSettings] = useState<GlobalSettings>(db.getSettings());
   const [activeTab, setActiveTab] = useState<'orders' | 'wallet'>('orders');
+  const [qrError, setQrError] = useState(false);
   
   // Wallet Add Money State
   const [amount, setAmount] = useState('');
@@ -19,6 +20,7 @@ export const UserDashboard: React.FC = () => {
   useEffect(() => {
     const handleSettingsUpdate = () => {
       setSettings(db.getSettings());
+      setQrError(false); // Reset error state on new settings
     };
     
     // Listen for custom event from db.saveSettings (same window)
@@ -34,6 +36,14 @@ export const UserDashboard: React.FC = () => {
       window.removeEventListener('storage', handleSettingsUpdate);
     };
   }, []);
+
+  // Also force refresh when clicking wallet tab
+  useEffect(() => {
+    if (activeTab === 'wallet') {
+      setSettings(db.getSettings());
+      setQrError(false);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (user) {
@@ -150,21 +160,23 @@ export const UserDashboard: React.FC = () => {
           <div className="bg-surface p-6 rounded-2xl border border-slate-700">
             <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Wallet className="text-primary"/> Add Funds</h3>
             
-            <div className="flex flex-col items-center justify-center mb-6 bg-white p-4 rounded-xl w-max mx-auto">
+            <div className="flex flex-col items-center justify-center mb-6 bg-white p-4 rounded-xl w-max mx-auto overflow-hidden">
                {/* QR Display */}
-               {settings.upiQrUrl ? (
+               {settings.upiQrUrl && !qrError ? (
                  <img 
                    src={settings.upiQrUrl} 
                    alt="UPI QR" 
                    className="w-48 h-48 object-contain"
-                   onError={(e) => {
-                     (e.target as HTMLImageElement).style.display = 'none';
-                   }} 
+                   onError={() => setQrError(true)} 
                  />
                ) : (
-                 <div className="w-48 h-48 flex items-center justify-center bg-gray-200 text-gray-500 text-sm">No QR Code</div>
+                 <div className="w-48 h-48 flex flex-col items-center justify-center bg-gray-100 text-slate-800 text-sm p-4 text-center">
+                   <ImageOff size={24} className="mb-2 text-slate-400"/>
+                   <span className="font-medium">QR not available</span>
+                   <span className="text-xs text-slate-500 mt-1">Please use UPI ID below</span>
+                 </div>
                )}
-               <p className="text-black font-mono font-bold mt-2 text-sm">{settings.upiId}</p>
+               <p className="text-black font-mono font-bold mt-2 text-sm px-2 py-1 bg-gray-100 rounded">{settings.upiId}</p>
             </div>
             
             <p className="text-center text-slate-400 text-sm mb-6 bg-slate-800/50 p-3 rounded-lg border border-slate-700">

@@ -58,8 +58,8 @@ export const AdminDashboard: React.FC = () => {
 };
 
 // --- Helper for file upload & compression ---
-// Updated to be more aggressive with compression to ensure it fits in localStorage
-const compressImage = (file: File, maxWidth = 400, quality = 0.7): Promise<string> => {
+// Heavily compressed to ensure it fits in localStorage (Max 300px width, 0.6 quality)
+const compressImage = (file: File, maxWidth = 300, quality = 0.6): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -81,7 +81,7 @@ const compressImage = (file: File, maxWidth = 400, quality = 0.7): Promise<strin
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', quality)); // Compress as JPEG with 0.7 quality
+          resolve(canvas.toDataURL('image/jpeg', quality)); 
         } else {
             reject(new Error("Canvas context failed"));
         }
@@ -470,7 +470,18 @@ const SettingsPanel = () => {
     if (file) {
       try {
         const base64 = await compressImage(file);
-        setSettings({ ...settings, upiQrUrl: base64 });
+        
+        // AUTO SAVE IMMEDIATELY
+        const updatedSettings = { ...settings, upiQrUrl: base64 };
+        setSettings(updatedSettings);
+        
+        try {
+            db.saveSettings(updatedSettings);
+            alert("QR Code updated and saved successfully!");
+        } catch(e) {
+            alert("Storage full! Please use a simpler image.");
+        }
+
       } catch (err) {
         console.error(err);
         alert("Failed to upload QR image");
@@ -499,7 +510,7 @@ const SettingsPanel = () => {
                  className="w-full bg-background border border-slate-600 rounded p-2 text-white" 
                  placeholder="Image URL or Upload"
                />
-               <label className="cursor-pointer bg-slate-700 hover:bg-slate-600 p-2 rounded text-white flex items-center justify-center min-w-[44px]" title="Upload QR">
+               <label className="cursor-pointer bg-slate-700 hover:bg-slate-600 p-2 rounded text-white flex items-center justify-center min-w-[44px]" title="Upload QR (Auto-saves)">
                     <Upload size={18} />
                     <input type="file" accept="image/*" onChange={handleQrUpload} className="hidden" />
                </label>
@@ -518,7 +529,7 @@ const SettingsPanel = () => {
              className="w-full bg-background border border-slate-600 rounded p-2 text-white h-24" 
            />
         </div>
-        <button className="bg-primary text-white px-6 py-2 rounded hover:bg-indigo-600">Save Changes</button>
+        <button className="bg-primary text-white px-6 py-2 rounded hover:bg-indigo-600">Save Text Changes</button>
       </form>
     </div>
   );
